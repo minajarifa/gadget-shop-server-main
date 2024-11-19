@@ -9,7 +9,11 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 // middleware
-app.use(cors());
+app.use(cors(
+  origin= "http://localhost:5173",
+  optionSuccessStatus=200
+
+));
 app.use(express.json());
 // mongodb
 
@@ -32,7 +36,16 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-    //
+    // get user
+    app.get("/user/:email",async(req,res)=>{
+      const query ={email: req.params.email}
+      const user = await userCollection.findOne(query);
+      if(!user){
+        return res.send({message:"No user found"})
+      }
+      res.send(user)
+    })
+    //post users
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query ={email: user.email};
