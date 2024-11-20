@@ -10,13 +10,37 @@ const app = express();
 const port = process.env.PORT || 3000;
 // middleware
 app.use(cors(
-  origin= "http://localhost:5173",
-  optionSuccessStatus=200
-
+{  origin:"http://localhost:5173",
+  optionSuccessStatus:200
+}
 ));
 app.use(express.json());
+// token verification
+const verifyJWT = (req,res,next)=>{
+  const authorization = req.header.authorization;
+  if(!authorization){
+     return res.send({message:"No Token"})
+  }
+  const token = authorization.split(" ")[1];
+  jwt.verify(token,process.env.ACCESS_KEY_TOKEN,(err,decode)=>{
+    if(err){
+      return res.send({message:"Invalid Token"})
+    }
+    req.decode = decode;
+    next();
+  })
+}
+// seller varification
+const verifyToken =async(req,res,next)=>{
+  const email =req.decode.email;
+  const query = {email:email};
+  const user = await userCollection.findOne(query);
+  if(user?.role !== "seller"){
+    return res.send({message:"Forbuden Access"})
+  }
+  next()
+}
 // mongodb
-
 // const  uri = "mongodb+srv://GADGET:DWXqcOaDqMD0w5b0@cluster0.63qrdth.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.63qrdth.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -56,6 +80,13 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
+    // add products
+    app.post("/add-products",verifyJWT,verifyToken,async(req,send)=>{
+      const product = req.body;
+      const result = await productsCollection.insertOne(product);
+      res.send(result);
+
+    })
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
