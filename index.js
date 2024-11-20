@@ -94,7 +94,23 @@ async function run() {
       // filter by category
       // filter by brand
 
-      const { name, sort, category, brand } = req.query;
+      const { title, sort, category, brand } = req.query;
+      const query = {};
+      if (title) {
+        query.title = { $regex: title, $options: "i" };
+      }
+      if (category) {
+        query.category = { $regex: category, $options: "i" };
+      }
+      if (brand) {
+        query.brand = brand;
+      }
+      const sortOption = sort === "asc" ? 1 : -1;
+      const products = await productsCollection
+        .find(query)
+        .sort({ price: sortOption })
+        .toArray();
+      res.json(products);
     });
 
     // Send a ping to confirm a successful connection
