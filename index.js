@@ -88,30 +88,40 @@ async function run() {
       }
     );
     // All Get Products
+    // name searching
+    // sort by price
+    // filter by category
+    // filter by brand
     app.get("/all-products", async (req, res) => {
-      // name searching
-      // sort by price
-      // filter by category
-      // filter by brand
-
-      const { title, sort, category, brand } = req.query;
+      const { title, sort, category: categoryFilter, brand: brandFilter } = req.query;
       const query = {};
       if (title) {
         query.title = { $regex: title, $options: "i" };
       }
-      if (category) {
-        query.category = { $regex: category, $options: "i" };
+      if (categoryFilter) {
+        query.category = { $regex: categoryFilter, $options: "i" };
       }
-      if (brand) {
-        query.brand = brand;
+      if (brandFilter) {
+        query.brand = brandFilter;
       }
       const sortOption = sort === "asc" ? 1 : -1;
       const products = await productsCollection
         .find(query)
         .sort({ price: sortOption })
         .toArray();
-      res.json(products);
+      const totalProodacts = await productsCollection.countDocuments(query);
+    
+      const productInfo = await productsCollection
+        .find({}, { projection: { category: 1, brand: 1 } })
+        .toArray();
+      const category = [
+        ...new Set(productInfo.map((product) => product.category)),
+      ];
+      const brand = [...new Set(productInfo.map((product) => product.brand))];
+    
+      res.json({ products, brand, category,totalProodacts });
     });
+    
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
