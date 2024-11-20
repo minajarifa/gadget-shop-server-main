@@ -9,37 +9,33 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 // middleware
-app.use(cors(
-{  origin:"http://localhost:5173",
-  optionSuccessStatus:200
-}
-));
+app.use(cors({ origin: "http://localhost:5173", optionSuccessStatus: 200 }));
 app.use(express.json());
 // token verification
-const verifyJWT = (req,res,next)=>{
-  const authorization = req.header.authorization;
-  if(!authorization){
-     return res.send({message:"No Token"})
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.send({ message: "No Token" });
   }
   const token = authorization.split(" ")[1];
-  jwt.verify(token,process.env.ACCESS_KEY_TOKEN,(err,decode)=>{
-    if(err){
-      return res.send({message:"Invalid Token"})
+  jwt.verify(token, process.env.ACCESS_KEY_TOKEN, (err, decode) => {
+    if (err) {
+      return res.send({ message: "Invalid Token" });
     }
     req.decode = decode;
     next();
-  })
-}
+  });
+};
 // seller varification
-const verifyToken =async(req,res,next)=>{
-  const email =req.decode.email;
-  const query = {email:email};
+const verifySellarToken = async (req, res, next) => {
+  const email = req.decode.email;
+  const query = { email: email };
   const user = await userCollection.findOne(query);
-  if(user?.role !== "seller"){
-    return res.send({message:"Forbuden Access"})
+  if (user?.role !== "seller") {
+    return res.send({ message: "Forbuden Access" });
   }
-  next()
-}
+  next();
+};
 // mongodb
 // const  uri = "mongodb+srv://GADGET:DWXqcOaDqMD0w5b0@cluster0.63qrdth.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
@@ -61,34 +57,48 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     // get user
-    app.get("/user/:email",async(req,res)=>{
-      const query ={email: req.params.email}
+    app.get("/user/:email", async (req, res) => {
+      const query = { email: req.params.email };
       const user = await userCollection.findOne(query);
-      if(!user){
-        return res.send({message:"No user found"})
+      if (!user) {
+        return res.send({ message: "No user found" });
       }
-      res.send(user)
-    })
+      res.send(user);
+    });
     //post users
     app.post("/users", async (req, res) => {
       const user = req.body;
-      const query ={email: user.email};
+      const query = { email: user.email };
       const existEmail = await userCollection.findOne(query);
-      if(existEmail){
-        return res.send({message:"user already exist"})
+      if (existEmail) {
+        return res.send({ message: "user already exist" });
       }
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
     // add products
-    app.post("/add-products",verifyJWT,verifyToken,async(req,send)=>{
-      const product = req.body;
-      const result = await productsCollection.insertOne(product);
-      res.send(result);
+    app.post(
+      "/add-products",
+      verifyJWT,
+      verifySellarToken,
+      async (req, res) => {
+        const product = req.body;
+        const result = await productsCollection.insertOne(product);
+        res.send(result);
+      }
+    );
+    // All Get Products
+    app.get("/all-products", async (req, res) => {
+      // name searching
+      // sort by price
+      // filter by category
+      // filter by brand
 
-    })
+      const { name, sort, category, brand } = req.query;
+    });
+
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
