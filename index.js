@@ -5,7 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 // middleware
@@ -93,7 +93,14 @@ async function run() {
     // filter by category
     // filter by brand
     app.get("/all-products", async (req, res) => {
-      const { title, sort, category: categoryFilter, brand: brandFilter } = req.query;
+      const {
+        title,
+        sort,
+        category: categoryFilter,
+        brand: brandFilter,
+        page = 1,
+        limit = 9,
+      } = req.query;
       const query = {};
       if (title) {
         query.title = { $regex: title, $options: "i" };
@@ -104,23 +111,71 @@ async function run() {
       if (brandFilter) {
         query.brand = brandFilter;
       }
+      const pageNumber = Number(page);
+      const limitNumber = Number(limit);
       const sortOption = sort === "asc" ? 1 : -1;
       const products = await productsCollection
         .find(query)
+        .skip((pageNumber - 1) * limitNumber)
+        .limit(limitNumber)
         .sort({ price: sortOption })
         .toArray();
       const totalProodacts = await productsCollection.countDocuments(query);
-    
+
       const productInfo = await productsCollection
         .find({}, { projection: { category: 1, brand: 1 } })
         .toArray();
-      const category = [
+      const categoryList = [
         ...new Set(productInfo.map((product) => product.category)),
       ];
-      const brand = [...new Set(productInfo.map((product) => product.brand))];
-    
-      res.json({ products, brand, category,totalProodacts });
+      const brandList = [
+        ...new Set(productInfo.map((product) => product.brand)),
+      ];
+
+      res.json({
+        products,
+        brand: brandList,
+        category: categoryList,
+        totalProodacts,
+      });
     });
+    // add to wish list
+
+    app.patch("/wishList/add", async (req, res) => {
+      const { userEmail, productId } = req.body;
+      const result = await userCollection.updateOne(
+        { email: userEmail },
+        { $addToSet: { wishList: new ObjectId(String(productId)) } }
+      );
+      res.send(result);
+    });
+
+    // get data from wish lish
+    app.get("/wishList/:userId", verifyJWT, async (req, res) => {
+     
+        const userId = req.params.userId; 
+        const user = await userCollection.findOne({
+          _id: new ObjectId(userId),
+        });
+        if (!user) {
+          return res.status(404).send({ message: "User not found" });
+        }
+        const wishList = await productsCollection
+          .find({ _id: { $in: user.wishList || [] } })
+          .toArray();
+        res.status(200).send(wishList);
+      
+    });
+    // remove from wishList 
+    app.delete("/wishList/remove", async (req, res) => {
+      const { userEmail, productId } = req.body;
+      const result = await userCollection.updateOne(
+          { email: userEmail },
+          { $pull: { wishList: new ObjectId(String(productId)) } }
+      );
+      res.send(result);
+  });
+  
     
 
     // Send a ping to confirm a successful connection
